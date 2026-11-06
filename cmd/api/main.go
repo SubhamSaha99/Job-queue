@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
 	"github.com/SubhamSaha99/job-queue/internal/config"
 	"github.com/SubhamSaha99/job-queue/internal/database"
+	jobqueue "github.com/SubhamSaha99/job-queue/internal/modules/job-queue"
 	"github.com/SubhamSaha99/job-queue/internal/modules/job-queue/routes"
 	"github.com/gin-gonic/gin"
 )
@@ -35,17 +37,23 @@ func main() {
 	// Create Gin server
 	router := gin.Default()
 
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status": "ok",
-		})
-	})
+	jobModule := jobqueue.JobModule(db)
+	jobAPI := router.Group("/api/v1/jobs")
+	
+	routes.RegisterJobRoutes(
+		jobAPI,
+		jobModule.JobController,
+	)
 
-	routes.RegisterJobRoutes(router.Group("/jobs"), db)
+	// Starting background worker
+	ctx := context.Background()
+	go jobModule.WorkerPool.Start(ctx)
 
 	address := fmt.Sprintf(":%s", cfg.Port)
 	slog.Info("Server running on", slog.String(":", address))
 	if err := router.Run(address); err != nil {
 		slog.Error("Server Startup", "Error:", err)
 	}
+
+	
 }

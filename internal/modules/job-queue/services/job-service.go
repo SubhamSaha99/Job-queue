@@ -55,14 +55,3 @@ func (j *JobService) FindJobById(
 	return job, nil
 }
 
-// Get pending job service
-func (j *JobService) FindPendingJobs(
-	ctx context.Context,
-	limit int,
-) ([]models.Job, error) {
-	models, err := j.jobRepository.FindPending(ctx, limit)
-	if err != nil {
-		return nil, fmt.Errorf("Find pending job: %w", err)
-	}
-	return models, nil
-}

@@ -75,33 +75,5 @@ func (j *JobController) FindJobById(c *gin.Context) {
 	})
 }
 
-// Find pending jobs controller
-func (j *JobController) FindPendingJobs(c *gin.Context) {
-	limit, err := strconv.Atoi(c.Param("limit"))
-	if err != nil || limit == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "Please provide a valid limit!",
-		})
-		return
-	}
 
-	jobs, err := j.jobService.FindPendingJobs(c.Request.Context(), limit)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": "failed to find pending job",
-		})
-		return
-	}
-	if len(jobs) == 0 {
-		c.JSON(http.StatusNotFound, gin.H{
-			"message": "There is no pending jobs",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Pending jobs fetched successfully",
-		"data":    jobs,
-	})
-}
 

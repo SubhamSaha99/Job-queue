@@ -94,6 +94,35 @@ func (j *JobRepository) UpdateStatus(
 	return nil
 }
 
+// Claim job repository
+func (j *JobRepository) ClaimJob(
+	ctx context.Context,
+	id uint,
+) error {
+	result := j.db.
+		WithContext(ctx).
+		Model(&models.Job{}).
+		Where(
+			"id = ? AND status = ?",
+			id,
+			models.JobStatusPending,
+		).
+		Updates(map[string]any{
+			"status": models.JobStatusProcessing,
+			"attempts": gorm.Expr("attempts + 1"),
+		})
+
+	if result.Error != nil {
+		return fmt.Errorf("claim job: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
+}
+
 // Mark failed
 func (j *JobRepository) MarkFailed(
 	ctx context.Context,
