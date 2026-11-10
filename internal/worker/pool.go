@@ -15,6 +15,7 @@ type WorkerPool struct {
 	workerCount   int
 	batchSize     int
 	interval      time.Duration
+	
 }
 
 // Contructor

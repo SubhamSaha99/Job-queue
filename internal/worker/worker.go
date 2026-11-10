@@ -28,7 +28,7 @@ func (w *Worker) ProcessJob(
 	ctx context.Context,
 	job models.Job,
 ) {
-	// Atomically claim the job.
+	// Claim the job
 	if err := w.jobRepository.ClaimJob(ctx, job.ID); err != nil {
 		slog.Warn(
 			"Job could not be claimed",
@@ -39,31 +39,54 @@ func (w *Worker) ProcessJob(
 		return
 	}
 
-	slog.Info(
-		"Worker processing job",
-		"worker_id", w.id,
-		"job_id", job.ID,
-		"type", job.Type,
-	)
+	// Keep the local job object in sync with the database.
+	job.Attempts++
 
-	// Execute the actual job.
+	// Execute the job
 	if err := w.executeJob(&job); err != nil {
-		if updateErr := w.jobRepository.MarkFailed(
+
+		// Retry if attempts are remaining
+		if job.Attempts < job.MaxAttempts {
+			slog.Warn(
+				"Job failed, will retry",
+				"job_id", job.ID,
+				"attempt", job.Attempts,
+				"max_attempts", job.MaxAttempts,
+				"error", err,
+			)
+
+			if err := w.jobRepository.UpdateStatus(
+				ctx,
+				job.ID,
+				models.JobStatusPending,
+			); err != nil {
+				slog.Error(
+					"Failed to reset job status",
+					"job_id", job.ID,
+					"error", err,
+				)
+			}
+
+			return
+		}
+
+		// No retry attempts remaining
+		if err := w.jobRepository.MarkFailed(
 			ctx,
 			job.ID,
 			err.Error(),
-		); updateErr != nil {
+		); err != nil {
 			slog.Error(
 				"Failed to mark job as failed",
-				"worker_id", w.id,
 				"job_id", job.ID,
-				"error", updateErr,
+				"error", err,
 			)
 		}
+
 		return
 	}
 
-	// Mark as completed.
+	// Job completed successfully
 	if err := w.jobRepository.UpdateStatus(
 		ctx,
 		job.ID,
@@ -71,7 +94,6 @@ func (w *Worker) ProcessJob(
 	); err != nil {
 		slog.Error(
 			"Failed to mark job as completed",
-			"worker_id", w.id,
 			"job_id", job.ID,
 			"error", err,
 		)
@@ -95,8 +117,6 @@ func (w *Worker) executeJob(
 		"payload", job.Payload,
 	)
 
-	// Temporary execution logic.
-	// Later, you can create handlers for different job types.
 	if job.Type == "" {
 		return fmt.Errorf("job type is required")
 	}
